@@ -1,0 +1,25 @@
+# The medallion schemas and raw landing volume for the rotaperfume catalog.
+# The catalog itself is created out-of-band by scripts/criar-catalogo.sh (see
+# that script for why) before this resource is deployed.
+resources:
+  schemas:
+    bronze:
+      name: bronze
+      catalog_name: ${var.catalog}
+      comment: Raw truth — data exactly as it arrived from source systems, one table/file per source.
+    silver:
+      name: silver
+      catalog_name: ${var.catalog}
+      comment: Cleaned and modeled data, deduplicated and conformed across sources.
+    gold:
+      name: gold
+      catalog_name: ${var.catalog}
+      comment: Business-ready aggregates and marts, built for direct consumption.
+
+  volumes:
+    raw:
+      name: raw
+      catalog_name: ${var.catalog}
+      schema_name: ${resources.schemas.bronze.name}
+      volume_type: MANAGED
+      comment: Landing zone for raw ERP/CRM CSVs, uploaded by scripts/subir-raw.sh.

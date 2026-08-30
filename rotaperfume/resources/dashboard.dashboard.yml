@@ -1,0 +1,14 @@
+# O dashboard comercial, versionado como código: o JSON mora em
+# src/dashboards/ e sobe junto com o `databricks bundle deploy` — sem clique
+# nenhum na UI. dataset_schema fixo em "gold" porque é lá que fato_vendas e
+# as métricas conformadas vivem; as queries do JSON usam nome de tabela puro
+# (ex.: "FROM fato_vendas") e dependem de dataset_catalog/dataset_schema
+# abaixo para resolver o catálogo e o schema.
+resources:
+  dashboards:
+    dashboard_comercial:
+      display_name: 'Comercial — rotaperfume'
+      file_path: ../src/dashboards/dashboard-comercial.lvdash.json
+      warehouse_id: ${var.warehouse_id}
+      dataset_catalog: ${var.catalog}
+      dataset_schema: gold

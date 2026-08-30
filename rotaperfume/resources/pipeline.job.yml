@@ -1,0 +1,118 @@
+# The rotaperfume_pipeline job.
+#
+# Shape planned across the course's 6 nightly deliverables (this file
+# implements tasks 1-4 so far):
+#   1. raw_conferencia        - confirms the 10 ERP/CRM raw files landed in the Volume
+#   2. bronze_ingestao        - loads the raw files into bronze Delta tables
+#   3. silver_*  (x4)         - clean/type/deduplicate bronze into silver, with CHECK
+#                               constraints as the data contract. Four sql_task's,
+#                               all depends_on bronze_ingestao only, so they run in
+#                               parallel (no dependency between them).
+#   4. gold_dimensoes,        - gold: conformed dimensions, the single fato_vendas,
+#      gold_fato_vendas,        three marts built on it, and 9 tests that raise_error
+#      gold_marts, testes       (stopping the job) if any layer's revenue diverges.
+#                               Chained in that order — each depends only on the
+#                               previous one, never parallel with it.
+#   5. qualidade_dados        - data quality checks across the layers
+#   6. publicacao             - refreshes downstream consumers/dashboards
+resources:
+  jobs:
+    rotaperfume_pipeline:
+      name: rotaperfume_pipeline
+
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"
+        timezone_id: America/Sao_Paulo
+
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+
+      tasks:
+        - task_key: raw_conferencia
+          notebook_task:
+            notebook_path: ../src/raw/conferencia.py
+            base_parameters:
+              catalog: ${var.catalog}
+          environment_key: default
+
+        - task_key: bronze_ingestao
+          depends_on:
+            - task_key: raw_conferencia
+          notebook_task:
+            notebook_path: ../src/bronze/ingestao.py
+            base_parameters:
+              catalog: ${var.catalog}
+          environment_key: default
+
+        - task_key: silver_clientes
+          depends_on:
+            - task_key: bronze_ingestao
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ../src/silver/01-clientes.sql
+
+        - task_key: silver_pedidos
+          depends_on:
+            - task_key: bronze_ingestao
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ../src/silver/02-pedidos.sql
+
+        - task_key: silver_itens_e_produtos
+          depends_on:
+            - task_key: bronze_ingestao
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ../src/silver/03-itens-e-produtos.sql
+
+        - task_key: silver_crm_e_financeiro
+          depends_on:
+            - task_key: bronze_ingestao
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ../src/silver/04-crm-e-financeiro.sql
+
+        - task_key: gold_dimensoes
+          depends_on:
+            - task_key: silver_clientes
+            - task_key: silver_pedidos
+            - task_key: silver_itens_e_produtos
+            - task_key: silver_crm_e_financeiro
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ../src/gold/05-dimensoes.sql
+
+        - task_key: gold_fato_vendas
+          depends_on:
+            - task_key: gold_dimensoes
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ../src/gold/06-fato-vendas.sql
+
+        - task_key: gold_marts
+          depends_on:
+            - task_key: gold_fato_vendas
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ../src/gold/07-marts.sql
+
+        - task_key: testes
+          depends_on:
+            - task_key: gold_marts
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ../src/gold/08-testes.sql
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
