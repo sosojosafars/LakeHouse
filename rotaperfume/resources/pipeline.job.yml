@@ -1,7 +1,7 @@
 # The rotaperfume_pipeline job.
 #
 # Shape planned across the course's 6 nightly deliverables (this file
-# implements tasks 1-4 so far):
+# implements tasks 1-4 plus the first ML-layer task, ml_features, so far):
 #   1. raw_conferencia        - confirms the 10 ERP/CRM raw files landed in the Volume
 #   2. bronze_ingestao        - loads the raw files into bronze Delta tables
 #   3. silver_*  (x4)         - clean/type/deduplicate bronze into silver, with CHECK
@@ -13,6 +13,15 @@
 #      gold_marts, testes       (stopping the job) if any layer's revenue diverges.
 #                               Chained in that order — each depends only on the
 #                               previous one, never parallel with it.
+#   ml_features               - customer-grain feature tables (gold.features_treino /
+#                               gold.features_cliente) for the ML layer. Depends on
+#                               testes only: a model must never train on data that
+#                               hasn't passed the gold quality tests.
+#   ml_modelo                 - trains/registers the propensity model in Unity Catalog
+#                               (gold.propensao_compra, alias @prod) and scores
+#                               gold.features_cliente into gold.score_propensao.
+#   ml_fila                   - gold.fila_semanal (the 200 weekly contacts, with
+#                               reason/suggestion) plus the four SQL agent tools.
 #   5. qualidade_dados        - data quality checks across the layers
 #   6. publicacao             - refreshes downstream consumers/dashboards
 resources:
@@ -111,6 +120,32 @@ resources:
             warehouse_id: ${var.warehouse_id}
             file:
               path: ../src/gold/08-testes.sql
+
+        - task_key: ml_features
+          depends_on:
+            - task_key: testes
+          notebook_task:
+            notebook_path: ../src/ml/11-features.py
+            base_parameters:
+              catalog: ${var.catalog}
+          environment_key: default
+
+        - task_key: ml_modelo
+          depends_on:
+            - task_key: ml_features
+          notebook_task:
+            notebook_path: ../src/ml/12-modelo.py
+            base_parameters:
+              catalog: ${var.catalog}
+          environment_key: default
+
+        - task_key: ml_fila
+          depends_on:
+            - task_key: ml_modelo
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ../src/ml/13-fila.sql
 
       environments:
         - environment_key: default
