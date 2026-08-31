@@ -1,0 +1,18 @@
+# The commercial-leadership-facing Genie space. Serialized_space body lives in
+# direcao.geniespace.json (see that file's own generation script for the
+# deterministic md5 ids) and is inlined via file_path at deploy time.
+# Same warehouse/data as genie_comercial, but a separate space on purpose:
+# the instructions that make this one answer well for the direction
+# (lift_top200 not AUC, empty retorno_ligacao means "nobody logged one yet")
+# would just be noise for a salesperson, and vice versa. Genie is one per
+# audience, not one per company.
+resources:
+  genie_spaces:
+    genie_direcao:
+      title: 'Rota do Perfume · Direção'
+      description: >-
+        Genie para a direção comercial decidir a fila semanal de ligações —
+        não escreve SQL, decide quem ligar e quanto vale a fila.
+      parent_path: ${workspace.root_path}
+      warehouse_id: ${var.warehouse_id}
+      file_path: ../resources/direcao.geniespace.json

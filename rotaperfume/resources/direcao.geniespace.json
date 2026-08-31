@@ -1,0 +1,160 @@
+{
+  "version": 2,
+  "config": {
+    "sample_questions": [
+      {
+        "id": "287bf53a63d59a3ff7cd4e28fef717db",
+        "question": [
+          "Quanto vale a fila desta semana?"
+        ]
+      },
+      {
+        "id": "2d40895155830a1a327bf4146f305230",
+        "question": [
+          "O modelo e bom?"
+        ]
+      },
+      {
+        "id": "6939c7abe23c0d5362984d237807359f",
+        "question": [
+          "Quem eu ligo essa semana?"
+        ]
+      },
+      {
+        "id": "7affc74caa893af6879a8bd09f712337",
+        "question": [
+          "Quais clientes fora da fila estao em risco esta semana?"
+        ]
+      },
+      {
+        "id": "9c9035a4c8fd9c98e123765e22d5627f",
+        "question": [
+          "Quantas ligacoes ja foram registradas e quantas viraram pedido?"
+        ]
+      }
+    ]
+  },
+  "data_sources": {
+    "tables": [
+      {
+        "identifier": "lakehouse_rotaperfume.gold.clientes_em_risco",
+        "description": [
+          "Clientes fora da fila desta semana mas com atraso_relativo > 1 - ja passaram do proprio ciclo de recompra."
+        ]
+      },
+      {
+        "identifier": "lakehouse_rotaperfume.gold.fila_semanal",
+        "description": [
+          "As 200 ligacoes da semana, uma linha por vendedor-cliente, com score, motivo e sugestao. E o assunto principal deste space."
+        ]
+      },
+      {
+        "identifier": "lakehouse_rotaperfume.gold.modelo_metricas",
+        "description": [
+          "Metricas do modelo de propensao de compra. Use lift_top200 para responder se o modelo e bom - nunca a coluna auc."
+        ]
+      },
+      {
+        "identifier": "lakehouse_rotaperfume.gold.ranking_marcas",
+        "description": [
+          "Todas as marcas ordenadas por receita, com participacao percentual no total da empresa."
+        ]
+      },
+      {
+        "identifier": "lakehouse_rotaperfume.gold.receita_mensal",
+        "description": [
+          "Receita e margem por ano/mes do pedido, para perguntas sobre tendencia."
+        ]
+      },
+      {
+        "identifier": "lakehouse_rotaperfume.gold.retorno_ligacao",
+        "description": [
+          "O que aconteceu depois de cada ligacao da fila, registrado pelo time - nao pelo pipeline. Comeca vazia: zero linhas e a resposta certa ate o time registrar algo."
+        ]
+      },
+      {
+        "identifier": "lakehouse_rotaperfume.gold.score_propensao",
+        "description": [
+          "Score de propensao de compra em 7 dias (0 a 1) de TODOS os clientes, nao so os 200 da fila."
+        ]
+      }
+    ]
+  },
+  "instructions": {
+    "example_question_sqls": [
+      {
+        "id": "2782898fb1894e494f1a1d3f8d91f1ae",
+        "question": [
+          "Quem eu ligo essa semana?"
+        ],
+        "sql": [
+          "SELECT vendedor, ordem, razao_social, cidade, score, faixa, motivo\n",
+          "FROM lakehouse_rotaperfume.gold.fila_semanal\n",
+          "ORDER BY vendedor, ordem"
+        ]
+      },
+      {
+        "id": "6c8a0d37a16a2db6e79153fa0f848a33",
+        "question": [
+          "Quanto vale a fila desta semana?"
+        ],
+        "sql": [
+          "SELECT ROUND(SUM(score * ticket_medio), 2) AS receita_esperada\n",
+          "FROM lakehouse_rotaperfume.gold.fila_semanal"
+        ]
+      },
+      {
+        "id": "89f136d5cc83e31e7b19116cd81ce01a",
+        "question": [
+          "Quantas ligacoes ja foram registradas e quantas viraram pedido?"
+        ],
+        "sql": [
+          "SELECT COUNT(*) AS ligacoes_registradas,\n",
+          "       SUM(CASE WHEN status = 'vendeu' THEN 1 ELSE 0 END) AS viraram_pedido\n",
+          "FROM lakehouse_rotaperfume.gold.retorno_ligacao"
+        ]
+      },
+      {
+        "id": "c00d241f96dc61003b9c676f3fb67e18",
+        "question": [
+          "O modelo e bom?"
+        ],
+        "sql": [
+          "SELECT lift_top200, acertos_top200, taxa_base\n",
+          "FROM lakehouse_rotaperfume.gold.modelo_metricas\n",
+          "ORDER BY versao DESC\n",
+          "LIMIT 1"
+        ]
+      },
+      {
+        "id": "e63afd79e6855d1c825ee168ae4680a1",
+        "question": [
+          "Quais clientes fora da fila estao em risco esta semana?"
+        ],
+        "sql": [
+          "SELECT razao_social, cidade, recencia_dias, atraso_relativo\n",
+          "FROM lakehouse_rotaperfume.gold.clientes_em_risco\n",
+          "WHERE cliente_id NOT IN (SELECT CAST(cliente_id AS STRING) FROM lakehouse_rotaperfume.gold.fila_semanal)\n",
+          "ORDER BY atraso_relativo DESC\n",
+          "LIMIT 20"
+        ]
+      }
+    ],
+    "text_instructions": [
+      {
+        "id": "a335cbbfcb7b2cb5a6713ce0fe6062df",
+        "content": [
+          "Quem pergunta aqui e a direcao comercial: nao escreve SQL, decide quem ligar esta semana. Respostas devem ser diretas e acionaveis, sem jargao tecnico de modelo.\n",
+          "score (em gold.score_propensao e gold.fila_semanal) vai de 0 a 1 e mede a chance do cliente comprar nos proximos 7 dias. faixa classifica o score em Fria/Morna/Quente/Muito quente. ordem e a posicao do cliente na fila DO VENDEDOR DELE, nao a posicao geral entre os 200.\n",
+          "A fila e GLOBAL, nao tem cota igual por vendedor: quem tem carteira quente recebe mais contatos, e isso esta certo - nunca sugira redistribuir a fila para igualar a quantidade por vendedor.\n",
+          "Receita esperada da fila = SUM(score * ticket_medio) sobre gold.fila_semanal. E SEMPRE uma ESTIMATIVA (a chance de compra vezes o ticket medio historico), nunca chame isso de receita realizada ou faturamento.\n",
+          "A metrica da direcao para avaliar o modelo e lift_top200 (de gold.modelo_metricas): quantas vezes melhor que ligar aleatoriamente. NUNCA cite a coluna auc para responder pergunta de negocio - auc e metrica de quem treina o modelo, nao de quem decide ligacao.\n",
+          "gold.retorno_ligacao comeca VAZIA. Se a pergunta envolver retorno e o resultado for zero ou a tabela estiver vazia, diga explicitamente que ninguem registrou retorno ainda - nunca invente um numero e nunca use gold.fila_semanal como se fosse retorno de ligacao.\n",
+          "Um cliente pode ter mais de um registro em gold.retorno_ligacao ao longo do tempo. Para o estado ATUAL de um cliente, use o registro mais recente por registrado_em (nao some nem conte todos os registros como eventos independentes sem deixar isso claro).\n",
+          "A sazonalidade do setor e INVERTIDA: o pico de vendas e no mes ANTERIOR a uma data comemorativa (compra antecipada para revenda), nao no mes da propria data.\n",
+          "Nunca consulte o schema bronze. Todas as respostas vem exclusivamente das sete tabelas gold listadas nas fontes deste space.\n"
+        ]
+      }
+    ]
+  }
+}

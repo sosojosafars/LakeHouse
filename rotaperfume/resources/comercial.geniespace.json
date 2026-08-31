@@ -1,0 +1,165 @@
+{
+  "version": 2,
+  "config": {
+    "sample_questions": [
+      {
+        "id": "0b6ebb11c4dba133c39fbbaa522dcaac",
+        "question": [
+          "Quais clientes da minha carteira estao em risco?"
+        ]
+      },
+      {
+        "id": "39d15ee1e0666e91db9eb45f19d7ebc4",
+        "question": [
+          "Quem eu ligo essa semana?"
+        ]
+      },
+      {
+        "id": "c501ee261e6b1796c31f113c3370a47c",
+        "question": [
+          "Quais marcas mais vendem?"
+        ]
+      },
+      {
+        "id": "e964371f101165b53e3c2c8863119457",
+        "question": [
+          "Quanto a Perfumaria Rosa Dos Ventos Ltda comprou este ano?"
+        ]
+      },
+      {
+        "id": "f17e286db116e721dc8dd6627cae1ed8",
+        "question": [
+          "Qual meu atingimento de meta este mes?"
+        ]
+      }
+    ]
+  },
+  "data_sources": {
+    "tables": [
+      {
+        "identifier": "lakehouse_rotaperfume.gold.clientes_em_risco",
+        "description": [
+          "Clientes com atraso_relativo > 1 - ja passaram do proprio ciclo de recompra e nao estao na fila desta semana."
+        ]
+      },
+      {
+        "identifier": "lakehouse_rotaperfume.gold.dim_cliente",
+        "description": [
+          "Uma linha por cliente: razao social, segmento, cidade, historico agregado de pedidos."
+        ]
+      },
+      {
+        "identifier": "lakehouse_rotaperfume.gold.fato_vendas",
+        "description": [
+          "Fato de vendas, grao item de pedido. receita ja inclui devolucao com sinal negativo; para o bruto vendido use SUM(receita) FILTER (WHERE NOT devolucao)."
+        ]
+      },
+      {
+        "identifier": "lakehouse_rotaperfume.gold.fila_semanal",
+        "description": [
+          "As 200 ligacoes da semana. Filtre por vendedor = nome do vendedor para ver so a fila de um vendedor especifico."
+        ]
+      },
+      {
+        "identifier": "lakehouse_rotaperfume.gold.mart_produto_performance",
+        "description": [
+          "Receita, margem e curva ABC por SKU x mes."
+        ]
+      },
+      {
+        "identifier": "lakehouse_rotaperfume.gold.mart_vendas_por_vendedor",
+        "description": [
+          "Receita, margem e atingimento de meta por vendedor x mes."
+        ]
+      },
+      {
+        "identifier": "lakehouse_rotaperfume.gold.ranking_marcas",
+        "description": [
+          "Todas as marcas ordenadas por receita da empresa inteira, com participacao percentual - nao e recortado por vendedor."
+        ]
+      },
+      {
+        "identifier": "lakehouse_rotaperfume.gold.receita_mensal",
+        "description": [
+          "Receita e margem por ano/mes da empresa inteira - nao e recortado por vendedor."
+        ]
+      }
+    ]
+  },
+  "instructions": {
+    "example_question_sqls": [
+      {
+        "id": "6fd416dec7b92946599daacf592ad5ad",
+        "question": [
+          "Quais clientes da minha carteira estao em risco?"
+        ],
+        "sql": [
+          "SELECT razao_social, cidade, recencia_dias, atraso_relativo\n",
+          "FROM lakehouse_rotaperfume.gold.clientes_em_risco\n",
+          "ORDER BY atraso_relativo DESC\n",
+          "LIMIT 20"
+        ]
+      },
+      {
+        "id": "c116545ad18e6b41ffa738e21a7a9630",
+        "question": [
+          "Quem eu ligo essa semana?"
+        ],
+        "sql": [
+          "SELECT vendedor, ordem, razao_social, cidade, score, faixa, motivo, sugestao\n",
+          "FROM lakehouse_rotaperfume.gold.fila_semanal\n",
+          "ORDER BY vendedor, ordem"
+        ]
+      },
+      {
+        "id": "d2a6577b815438c3d87f2464aeca0b89",
+        "question": [
+          "Quanto a Perfumaria Rosa Dos Ventos Ltda comprou este ano?"
+        ],
+        "sql": [
+          "SELECT razao_social, SUM(receita) AS receita_2026\n",
+          "FROM lakehouse_rotaperfume.gold.fato_vendas\n",
+          "WHERE razao_social = 'Perfumaria Rosa Dos Ventos Ltda' AND ano = 2026\n",
+          "GROUP BY razao_social"
+        ]
+      },
+      {
+        "id": "d623617d97da4713c22211a7182c8ef5",
+        "question": [
+          "Qual meu atingimento de meta este mes?"
+        ],
+        "sql": [
+          "SELECT nome, ano, mes, receita, meta, atingimento\n",
+          "FROM lakehouse_rotaperfume.gold.mart_vendas_por_vendedor\n",
+          "WHERE ano = 2026 AND mes = 8\n",
+          "ORDER BY nome"
+        ]
+      },
+      {
+        "id": "fea31cf24147a18d365537805de054f0",
+        "question": [
+          "Quais marcas mais vendem?"
+        ],
+        "sql": [
+          "SELECT marca, receita, participacao_pct, posicao\n",
+          "FROM lakehouse_rotaperfume.gold.ranking_marcas\n",
+          "ORDER BY posicao\n",
+          "LIMIT 10"
+        ]
+      }
+    ],
+    "text_instructions": [
+      {
+        "id": "75d297c05286f8bac62dc54b2aad3dcf",
+        "content": [
+          "Quem pergunta aqui e o vendedor individual: sobre sua propria carteira, um cliente especifico, ou sua fila da semana. Nao cite lift_top200 nem auc - metrica de modelo e assunto do space da direcao, nao deste.\n",
+          "gold.fato_vendas tem grao de item de pedido. receita JA inclui devolucao com sinal negativo (nao filtre devolucao por padrao); para o bruto vendido sem devolucao use SUM(receita) FILTER (WHERE NOT devolucao).\n",
+          "Para a fila de UM vendedor especifico, filtre gold.fila_semanal por vendedor = 'nome do vendedor'. ordem e a posicao dentro da fila desse vendedor.\n",
+          "mart_vendas_por_vendedor.atingimento = receita do mes / meta_mensal do vendedor. 1.0 significa que bateu a meta exatamente.\n",
+          "gold.ranking_marcas e gold.receita_mensal sao visao da EMPRESA INTEIRA, nao recortadas por vendedor ou por carteira - avise isso quando usar essas tabelas para responder.\n",
+          "Nunca consulte o schema bronze. Todas as respostas vem exclusivamente das tabelas gold listadas nas fontes deste space.\n"
+        ]
+      }
+    ]
+  }
+}

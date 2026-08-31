@@ -1,0 +1,53 @@
+bundle:
+  name: rotaperfume-direcao
+
+variables:
+  sql_warehouse_id:
+    description: SQL Warehouse ID
+  genie_space_id:
+    description: Default Genie Space ID
+  genie_space_name:
+    description: Genie Space display name
+
+resources:
+  apps:
+    app:
+      name: "rotaperfume-direcao"
+      description: "A fila dos 200 na tela do diretor"
+      source_code_path: ./
+
+      # Start the app automatically on deploy.
+      lifecycle:
+        started: true
+      user_api_scopes:
+        - dashboards.genie
+
+      # The resources which this app has access to.
+      resources:
+        - name: sql-warehouse
+          sql_warehouse:
+            id: ${var.sql_warehouse_id}
+            permission: CAN_USE
+        - name: genie-space
+          genie_space:
+            name: ${var.genie_space_name}
+            space_id: ${var.genie_space_id}
+            permission: CAN_RUN
+        # Escrita do POST /api/retorno. Escopado em UMA tabela (MODIFY em
+        # TABLE, não em SCHEMA) — o app não pode alterar mais nada da gold.
+        - name: retorno-ligacao
+          uc_securable:
+            securable_full_name: lakehouse_rotaperfume.gold.retorno_ligacao
+            securable_type: TABLE
+            permission: MODIFY
+
+targets:
+  default:
+    default: true
+    workspace:
+      host: https://dbc-ba1b94f4-364f.cloud.databricks.com
+
+    variables:
+      sql_warehouse_id: 10eb01bbaddccb09
+      genie_space_id: 01f1a4d6b64a1b94a931bedd9b99cd3c
+      genie_space_name: Rota do Perfume · Direção

@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repo layout
 
-This repo has two independent parts:
+This repo has three independent parts:
 
 - `rotaperfume/` — a Databricks Asset Bundle (DAB) project. All bundle config, source code, and tests live here. Treat this as the actual project root for build/test/deploy purposes.
 - `dados/` — raw CSV sample data for a fictional B2B perfume distributor ("rotaperfume"), used as source data for the bundle's pipeline. ERP-style tables: `produtos`, `pedidos`, `itens_pedido`, `pagamentos`, `estoque`. CRM-style tables: `clientes`, `vendedores`, `carteira`, `oportunidades`, `visitas`.
+- `rotaperfume-direcao/` — a Databricks App (AppKit, Node/TypeScript/React), deployed and managed independently from the `rotaperfume/` bundle (its own `databricks.yml`, `default` target, own `databricks apps deploy` lifecycle). Reads gold tables from the `rotaperfume/` bundle's `lakehouse_rotaperfume` catalog (`gold.fila_semanal`, `gold.modelo_metricas`, `gold.retorno_ligacao`) via `config/queries/*.sql`, and embeds the `Rota do Perfume · Direção` Genie space. Read-only for now — no write-back yet.
 
 **Before any other action in this repo, read `rotaperfume/AGENTS.md`** — it requires reading the `databricks-core` skill first for CLI auth, profile selection, data discovery, and the bundle deployment workflow. `rotaperfume/CLAUDE.md` imports `AGENTS.md` directly.
 
